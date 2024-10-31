@@ -63,8 +63,8 @@ services:
         condition: service_healthy
 
   qbittorrent-natmap:
-    # https://github.com/soxfor/qbittorrent-natmap
-    image: ghcr.io/soxfor/qbittorrent-natmap:latest
+    # https://github.com/epicofficer/qbittorrent-natmap
+    image: ghcr.io/epicofficer/qbittorrent-natmap:latest
     container_name: qbittorrent-natmap
     restart: unless-stopped
     volumes:
