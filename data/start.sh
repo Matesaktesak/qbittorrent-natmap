@@ -79,20 +79,20 @@ qbt_isreachable(){
 }
 
 fw_delrule(){
-    if (docker exec "${VPN_CT_NAME}" /sbin/iptables-legacy -L INPUT -n | grep -qP "^ACCEPT.*${configured_port}.*"); then
+    if (iptables-legacy -L INPUT -n | grep -qP "^ACCEPT.*${configured_port}.*"); then
         # shellcheck disable=SC2086
-        docker exec "${VPN_CT_NAME}" /sbin/iptables-legacy -D INPUT -i "${VPN_IF_NAME}" -p tcp --dport ${configured_port} -j ACCEPT
+        iptables-legacy -D INPUT -i "${VPN_IF_NAME}" -p tcp --dport ${configured_port} -j ACCEPT
         # shellcheck disable=SC2086
-        docker exec "${VPN_CT_NAME}" /sbin/iptables-legacy -D INPUT -i "${VPN_IF_NAME}" -p udp --dport ${configured_port} -j ACCEPT
+        iptables-legacy -D INPUT -i "${VPN_IF_NAME}" -p udp --dport ${configured_port} -j ACCEPT
     fi
 }
 
 fw_addrule(){
-    if ! (docker exec "${VPN_CT_NAME}" /sbin/iptables-legacy -L INPUT -n | grep -qP "^ACCEPT.*${active_port}.*"); then
+    if ! (iptables-legacy -L INPUT -n | grep -qP "^ACCEPT.*${active_port}.*"); then
         # shellcheck disable=SC2086
-        docker exec "${VPN_CT_NAME}" /sbin/iptables-legacy -A INPUT -i "${VPN_IF_NAME}" -p tcp --dport ${active_port} -j ACCEPT
+        iptables-legacy -A INPUT -i "${VPN_IF_NAME}" -p tcp --dport ${active_port} -j ACCEPT
         # shellcheck disable=SC2086
-        docker exec "${VPN_CT_NAME}" /sbin/iptables-legacy -A INPUT -i "${VPN_IF_NAME}" -p udp --dport ${active_port} -j ACCEPT
+        iptables-legacy -A INPUT -i "${VPN_IF_NAME}" -p udp --dport ${active_port} -j ACCEPT
         return 0
     else
         return 1
@@ -124,7 +124,7 @@ get_portmap() {
     if [ ${configured_port} != ${active_port} ]; then
         if qbt_changeport "${qbt_sid}" ${active_port}; then
             if fw_delrule; then
-                echo "$(timestamp) | IPTables rule deleted for port ${configured_port} on ${VPN_CT_NAME} container"
+                echo "$(timestamp) | IPTables rule deleted for port ${configured_port} on host"
             fi
             echo "$(timestamp) | Port Changed to: $(findconfiguredport ${qbt_sid})"
         else
@@ -136,23 +136,10 @@ get_portmap() {
     fi
 
     if fw_addrule; then
-        echo "$(timestamp) | IPTables rule added for port ${active_port} on ${VPN_CT_NAME} container"
+        echo "$(timestamp) | IPTables rule added for port ${active_port} on host"
     fi
 
     return $res
-}
-
-check_vpn_ct_health() {
-    while true;
-    do
-        if ! docker inspect "${VPN_CT_NAME}" --format='{{json .State.Health.Status}}' | grep -q '"healthy"'; then
-            echo "$(timestamp) | Waiting for ${VPN_CT_NAME} healthy state.."
-            sleep 3
-        else
-            echo "$(timestamp) | VPN container ${VPN_CT_NAME} in healthy state!"
-            break
-        fi
-    done
 }
 
 pre_reqs() {
@@ -167,7 +154,6 @@ QBITTORRENT_PORT
 QBITTORRENT_USER
 QBITTORRENT_PASS
 VPN_GATEWAY
-VPN_CT_NAME
 VPN_IF_NAME
 CHECK_INTERVAL
 NAT_LEASE_LIFETIME
@@ -198,9 +184,6 @@ public_ip=
 configured_port=
 active_port=
 qbt_sid=
-
-# Wait for a healthy state on the VPN container
-check_vpn_ct_health
 
 if pre_reqs; then load_vals; fi
 
