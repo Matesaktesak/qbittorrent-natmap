@@ -1,20 +1,16 @@
 # qBittorrent-NatMap 
 
-The objective of this container is to run a script that requests a port forward (via NAT-PMP) from the VPN provider and upon success changes the listening port of the qBittorrent client when running in Docker
+This container periodicity runs a script requesting a port forward (via NAT-PMP) from the VPN provider and changes the listening port in preexisting qBittorrent container accordingly.
 
-This solution is currently in use and tested with [Gluetun](https://github.com/qdm12/gluetun) and [qBittorrent](https://github.com/linuxserver/docker-qbittorrent) from Linuxserver.io and with VPN fron ProtonVPN using Wireguard.
+This solution is currently being tested with ProtonVPN using Wireguard and qBitTorrent container from Linuxserver.io.
 
 ## What made me do this?
 
-The need to improve the seeding/upload performance and not finding any work done for this scenario (qBittorrent using docker'ized VPN), but finding [this post on reddit](https://old.reddit.com/r/ProtonVPN/comments/10owypt/successful_port_forward_on_debian_wdietpi_using/) by u/TennesseeTater for Deluge made me try and do something similar. His post is also referenced in the [ProtonVPN Guide][1].
+The need to improve the seeding/upload performance and not finding any work done for this scenario (qBittorrent using Wireguard on UnRAID), but finding [this post on reddit](https://old.reddit.com/r/ProtonVPN/comments/10owypt/successful_port_forward_on_debian_wdietpi_using/) by u/TennesseeTater for Deluge made me try and do something similar. His post is also referenced in the [ProtonVPN Guide][1].
 
-## Why not modify the Gluetun image and include natpmpc there?
+## Why not use a scheduled script on host unRAID?
 
-Well, as far as I could find, Alpine Linux doesn't have natively the binary for **natpmpc**, the NAT-PMP client used to request the *port forward* as per the instructions for [manual mapping][1] on ProtonVPN. Gluetun is using alpine as it's base image.
-
-On AlpineLinux package info: [natpmpc binary not found][2] and [here][3] a request still in open state.
-
-If I had the binary needed on the Gluetun container a script running on the host system instead of the container would probably suffice, allowing the following action: doing "docker exec <container> natpmpc <args>"
+Well, as far as I could find, unRAID doesn't include **natpmpc**, the NAT-PMP client used to request the *port forward* as per the instructions for [manual mapping][1] on ProtonVPN. And you shouldn't install software directly on the host OS.
 
 ## What does the script do/modify?
 
@@ -32,26 +28,21 @@ So far:
         * The new port is configured in qBittorrent, along with that it's also disabled the random port setting and UPnP mapping from the torrent client
         * A couple of commands are executed to add/remove iptables rules regarding the previous active and new active mapped port on the VPN container
 
-These actions are performed continuously (in a loop, every 5 minutes (default, can be lowered/increased)), most likely an option to set a failure count will be added in the future.
+These actions are performed continuously (in a loop, every 60 seconds (default).
 
 ## Configurable variables:
 
-* QBITTORRENT_SERVER (Defaults to **localhost**)
-    * If setting here an address not related to the `VPN_IF_NAME` (default: tun0) a few users have [reported](https://old.reddit.com/r/ProtonVPN/comments/11ubgvi/port_forward_with_qbittorrent_and_protonvpn_on/jcxirts/) needing to set `FIREWALL_OUTBOUND_SUBNETS` for the Gluetun/VPN container
-    * For ProtonVPN using Wireguard and qBittorrent container using `VPN_CT_NAME` as network_mode this would be set to **10.2.0.2**
+* QBITTORRENT_SERVER (Defaults to **qbittorrent**)
 * QBITTORRENT_PORT (Defaults to **8080**)
 * QBITTORRENT_USER (Defaults to **admin**)
 * QBITTORRENT_PASS (Defaults to **adminadmin**)
 * VPN_GATEWAY (Defaults to **empty**)
     * If not set the script will try and find it
-    * The value for this variable will be the `VPN_IF_NAME` (default: tun0) gateway address, not the `VPN_ENDPOINT_IP` from the Gluetun/VPN Container when using Wireguard, [more info here](https://github.com/qdm12/gluetun/wiki/Custom-provider#wireguard-only).
+    * The value for this variable will be the `VPN_IF_NAME` (default: wg0) gateway address, not the `VPN_ENDPOINT_IP` from Wireguard.
     * For ProtonVPN using Wireguard this would be set to **10.2.0.1**
-* VPN_CT_NAME (Defaults to **gluetun**)
-* VPN_IF_NAME (Defaults to **tun0**)
-* CHECK_INTERVAL (Defaults to **300s**)
-* NAT_LEASE_LIFETIME (Defaults to **300s**)
+* VPN_IF_NAME (Defaults to **wg0**)
+* CHECK_INTERVAL (Defaults to **60s**)
+* NAT_LEASE_LIFETIME (Defaults to **60s**)
     * Ideally both `CHECK_INTERVAL` and `NAT_LEASE_LIFETIME` should be set equal or the check interval lower than the lease lifetime, but never above.
 
 [1]: https://protonvpn.com/support/port-forwarding-manual-setup/
-[2]: https://pkgs.alpinelinux.org/contents?file=natpmpc&path=&name=&branch=edge
-[3]: https://gitlab.alpinelinux.org/alpine/awall/-/issues/2220
