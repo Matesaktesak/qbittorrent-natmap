@@ -45,15 +45,14 @@ RUN sed -i "/${LANG}/s/^# //g" /etc/locale.gen && \
     ln -fs "/usr/share/zoneinfo/${TZ}" /etc/localtime && \
     dpkg-reconfigure tzdata
 
-ENV QBITTORRENT_SERVER=localhost
-ENV QBITTORRENT_PORT=8080
+ENV QBITTORRENT_SERVER=qbittorrent
+ENV QBITTORRENT_PORT=80
 ENV QBITTORRENT_USER=admin
 ENV QBITTORRENT_PASS=adminadmin
 ENV VPN_GATEWAY=
-ENV VPN_CT_NAME=gluetun
-ENV VPN_IF_NAME=tun0
-ENV CHECK_INTERVAL=300
-ENV NAT_LEASE_LIFETIME=300
+ENV VPN_IF_NAME=wg0
+ENV CHECK_INTERVAL=60
+ENV NAT_LEASE_LIFETIME=60
 
 COPY --from=docker-cli /usr/bin/docker /usr/bin/docker
 COPY data/start.sh /start.sh
