@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 
-FROM ubuntu:jammy AS docker-cli
+FROM ubuntu:latest AS docker-cli
 
 RUN apt-get update && \
     apt-get install --no-install-suggests --no-install-recommends --yes --quiet \
@@ -14,7 +14,7 @@ RUN mkdir -m 0755 -p /etc/apt/keyrings && \
 RUN apt-get update && \
     apt-get install --no-install-suggests --no-install-recommends --yes --quiet docker-ce-cli
 
-FROM ubuntu:jammy
+FROM ubuntu:latest
 
 LABEL org.opencontainers.image.source="https://github.com/soxfor/qbittorrent-natmap"
 LABEL org.opencontainers.image.base.name="ubuntu:jammy"
@@ -31,7 +31,8 @@ RUN apt-get install --no-install-suggests --no-install-recommends --yes --quiet 
     netcat-openbsd \
     tzdata \
     locales \
-    iproute2
+    iproute2 \
+    iptables
 RUN rm -rf /var/lib/apt/lists/* /var/cache/apt/*
 RUN apt-get clean
 

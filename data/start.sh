@@ -14,7 +14,6 @@ get_vpn_if_gw() {
     vpn_if_hex_addr=$(grep "${VPN_IF_NAME}" /proc/net/route | awk '$2 == "00000000" { print $3 }')
     
     if [ -n "${vpn_if_hex_addr}" ]; then
-        #shellcheck disable=SC2046
         vpn_if_dec_addr=$(printf "%d." $(echo "${vpn_if_hex_addr}" | sed 's/../0x& /g' | tr ' ' '\n' | tac) | sed 's/\.$/\n/')
     fi
 
@@ -40,7 +39,6 @@ get_vpn_if_gw() {
 }
 
 getpublicip() {
-    # shellcheck disable=SC2086
     natpmpc -g ${VPN_GATEWAY} | grep -oP '(?<=Public.IP.address.:.).*'
 }
 
@@ -48,15 +46,14 @@ findconfiguredport() {
     curl -s -i --header "Referer: http://${QBITTORRENT_SERVER}:${QBITTORRENT_PORT}" --cookie "$1" "http://${QBITTORRENT_SERVER}:${QBITTORRENT_PORT}/api/v2/app/preferences" | grep -oP '(?<=\"listen_port\"\:)(\d{1,5})'
 }
 
+# Add a port mapping for the qBittorrent port according to [ProtonVPN](https://protonvpn.com/support/port-forwarding-manual-setup/#linux)
 findactiveport() {
-    # shellcheck disable=SC2086
-    natpmpc -g ${VPN_GATEWAY} -a 0 0 udp ${NAT_LEASE_LIFETIME} >/dev/null 2>&1
-    # shellcheck disable=SC2086
-    natpmpc -g ${VPN_GATEWAY} -a 0 0 tcp ${NAT_LEASE_LIFETIME} | grep -oP '(?<=Mapped public port.).*(?=.protocol.*)'
+    natpmpc -g ${VPN_GATEWAY} -a 1 0 udp ${NAT_LEASE_LIFETIME} >/dev/null 2>&1
+    natpmpc -g ${VPN_GATEWAY} -a 1 0 tcp ${NAT_LEASE_LIFETIME} | grep -oP '(?<=Mapped public port.).*(?=.protocol.*)'
 }
 
 qbt_login() {
-    qbt_sid=$(curl -s -i --header "Referer: http://${QBITTORRENT_SERVER}:${QBITTORRENT_PORT}" --data "username=${QBITTORRENT_USER}" --data-urlencode "password=${QBITTORRENT_PASS}" "http://${QBITTORRENT_SERVER}:${QBITTORRENT_PORT}/api/v2/auth/login" | grep -oP '(?!set-cookie:.)SID=.*(?=\;.HttpOnly\;)')
+    qbt_sid=$(curl -s -i --header "Referer: http://${QBITTORRENT_SERVER}:${QBITTORRENT_PORT}" --data "username=${QBITTORRENT_USER}&password=${QBITTORRENT_PASS}" "http://${QBITTORRENT_SERVER}:${QBITTORRENT_PORT}/api/v2/auth/login" | grep -oP '(?!set-cookie:.)SID=.*(?=\;.HttpOnly\;)')
     return $?
 }
 
@@ -89,9 +86,7 @@ fw_delrule(){
 
 fw_addrule(){
     if ! (iptables-legacy -L INPUT -n | grep -qP "^ACCEPT.*${active_port}.*"); then
-        # shellcheck disable=SC2086
         iptables-legacy -A INPUT -i "${VPN_IF_NAME}" -p tcp --dport ${active_port} -j ACCEPT
-        # shellcheck disable=SC2086
         iptables-legacy -A INPUT -i "${VPN_IF_NAME}" -p udp --dport ${active_port} -j ACCEPT
         return 0
     else
@@ -120,7 +115,6 @@ get_portmap() {
     echo "$(timestamp) | Configured Port: ${configured_port}"
     echo "$(timestamp) | Active Port: ${active_port}"
 
-    # shellcheck disable=SC2086
     if [ ${configured_port} != ${active_port} ]; then
         if qbt_changeport "${qbt_sid}" ${active_port}; then
             if fw_delrule; then
@@ -143,12 +137,15 @@ get_portmap() {
 }
 
 pre_reqs() {
+    # If VPN_GATEWAY is not set, try to get it from the VPN_IF_NAME
     if [ -z "${VPN_GATEWAY}" ]; then
         VPN_GATEWAY=$(get_vpn_if_gw || echo '')
     fi
-while read -r var; do
-    [ -z "${!var}" ] && { echo "$(timestamp) | ${var} is empty or not set."; exit 1; }
-done << EOF
+
+    # Check if all required variables are set
+    while read -r var; do
+        [ -z "${!var}" ] && { echo "$(timestamp) | ${var} is empty or not set."; exit 1; }
+    done << EOF
 QBITTORRENT_SERVER
 QBITTORRENT_PORT
 QBITTORRENT_USER
@@ -159,9 +156,10 @@ CHECK_INTERVAL
 NAT_LEASE_LIFETIME
 EOF
 
-[ ! -S /var/run/docker.sock ] && { echo "$(timestamp) | Docker socket doesn't exist or is inaccessible"; exit 2; }
+    # Check if docker socket is available (irrelevant for now)
+    # [ ! -S /var/run/docker.sock ] && { echo "$(timestamp) | Docker socket doesn't exist or is inaccessible"; exit 2; }
 
-return 0
+    return 0
 }
 
 load_vals(){
